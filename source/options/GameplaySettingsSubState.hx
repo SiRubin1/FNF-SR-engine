@@ -39,7 +39,13 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 			'bool'); //Variable type
 		addOption(option);
 
-		var option:Option = new Option('Middlescroll',
+		var option:Option = new Option('Clear OverLapped Notes',
+			"If checked, deletes notes 1 ms close to eachother, \nmassively increases loading times",
+			'clearGhostNotes',
+			'bool');
+		addOption(option);
+
+		var option:Option = new Option('Middle Scroll',
 			'If checked, your notes get centered.',
 			'middleScroll',
 			'bool');
@@ -116,7 +122,7 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		addOption(option);
 
 		var option:Option = new Option('Safe Frames',
-			'Changes how many input frames you have for\nhitting a note early or late.',
+			'Changes how many input frames you have for\nhitting a note',
 			'safeFrames',
 			'float');
 		option.scrollSpeed = 5;

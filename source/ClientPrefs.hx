@@ -8,6 +8,7 @@ import flixel.input.gamepad.FlxGamepadInputID;
 class SaveVariables {
 	// -- BEHAVIOR OPTIONS -- //
 	public var autoPause:Bool = true;
+	public var clearGhostNotes:Bool = true;
 	public var showFPS:Bool = true;
 	public var flashing:Bool = true;
 	public var camZooms:Bool = true;

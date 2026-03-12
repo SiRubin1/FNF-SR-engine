@@ -132,6 +132,7 @@ class PlayState extends MusicBeatState
 	public var unspawnNotes:Array<Note> = [];
 	public var unspawnDatas:Array<ChartNoteData> = []; // ADD THIS
 	public var eventNotes:Array<EventNote> = [];
+	public var spawnIndex:Int = 0;
 
 	private var strumLine:FlxSprite;
 
@@ -390,15 +391,15 @@ class PlayState extends MusicBeatState
 		// String that contains the mode defined here so it isn't necessary to call changePresence for each mode
 		if (isStoryMode)
 		{
-			detailsText = "Story Mode: " + WeekData.getCurrentWeek().weekName;
+			detailsText = "bad Mode: " + WeekData.getCurrentWeek().weekName;
 		}
 		else
 		{
-			detailsText = "Freeplay";
+			detailsText = "normal mode";
 		}
 
 		// String for when the game is paused
-		detailsPausedText = "Paused - " + detailsText;
+		detailsPausedText = "why are you paused - " + detailsText;
 		#end
 
 		GameOverSubstate.resetVariables();
@@ -2576,16 +2577,17 @@ class PlayState extends MusicBeatState
 				if (!Std.isOfType(songNotes[3], String))
 					leNoteData.type = ChartingState.noteTypeList[songNotes[3]];
 
-				// Use a map key for O(1) jack detection instead of looping
-				final mapKey:String = leNoteData.strumLine + '_' + leNoteData.id + '_' + Math.round(leNoteData.time);
-				if (noteMap.exists(mapKey))
-				{
-					var existing = noteMap.get(mapKey);
-					existing.dispose();
-					noteDatas.remove(existing);
-					ghostNotesCleared++;
+				if (ClientPrefs.data.clearGhostNotes) {
+					final mapKey:String = leNoteData.strumLine + '_' + leNoteData.id + '_' + Math.round(leNoteData.time);
+					if (noteMap.exists(mapKey))
+					{
+						var existing = noteMap.get(mapKey);
+						existing.dispose();
+						noteDatas.remove(existing);
+						ghostNotesCleared++;
+					}
+					noteMap.set(mapKey, leNoteData);
 				}
-				noteMap.set(mapKey, leNoteData);
 				noteDatas.push(leNoteData);
 			}
 		}
@@ -3261,11 +3263,15 @@ class PlayState extends MusicBeatState
 			if (songSpeed < 1)
 				time /= songSpeed;
 
-			// Create notes from raw data just before they're needed
-			while (unspawnDatas.length > 0 && unspawnDatas[0].time - Conductor.songPosition < time * 2)
+			var spawnStart = haxe.Timer.stamp();
+			while (spawnIndex < unspawnDatas.length && unspawnDatas[spawnIndex].time - Conductor.songPosition < time * 2)
 			{
-				var noteData:ChartNoteData = unspawnDatas[0];
-				unspawnDatas.splice(0, 1);
+				var noteData:ChartNoteData = unspawnDatas[spawnIndex];
+				spawnIndex++;
+				if (spawnIndex > 1000) {
+					unspawnDatas.splice(0, spawnIndex);
+					spawnIndex = 0;
+				}
 
 				var oldNote:Note = null;
 				if (unspawnNotes.length > 0)
@@ -3349,6 +3355,7 @@ class PlayState extends MusicBeatState
 				}
 			}
 		}
+		
 
 		if (generatedMusic && !inCutscene)
 		{
@@ -3357,122 +3364,151 @@ class PlayState extends MusicBeatState
 			else
 				playerDance();
 
-			if (startedCountdown)
+		if (startedCountdown)
+		{
+			var fakeCrochet:Float = (60 / SONG.bpm) * 1000;
+			
+			// Cache strum data before the loop
+			var playerStrumX:Array<Float> = [];
+			var playerStrumY:Array<Float> = [];
+			var playerStrumAngle:Array<Float> = [];
+			var playerStrumDirection:Array<Float> = [];
+			var playerStrumAlpha:Array<Float> = [];
+			var playerStrumScroll:Bool = false;
+			var opponentStrumX:Array<Float> = [];
+			var opponentStrumY:Array<Float> = [];
+			var opponentStrumAngle:Array<Float> = [];
+			var opponentStrumDirection:Array<Float> = [];
+			var opponentStrumAlpha:Array<Float> = [];
+
+			for (i in 0...playerStrums.length) {
+				var s = playerStrums.members[i];
+				playerStrumX.push(s.x);
+				playerStrumY.push(s.y);
+				playerStrumAngle.push(s.angle);
+				playerStrumDirection.push(s.direction);
+				playerStrumAlpha.push(s.alpha);
+				playerStrumScroll = s.downScroll;
+			}
+			for (i in 0...opponentStrums.length) {
+				var s = opponentStrums.members[i];
+				opponentStrumX.push(s.x);
+				opponentStrumY.push(s.y);
+				opponentStrumAngle.push(s.angle);
+				opponentStrumDirection.push(s.direction);
+				opponentStrumAlpha.push(s.alpha);
+			}
+
+			notes.forEachAlive(function(daNote:Note)
 			{
-				var fakeCrochet:Float = (60 / SONG.bpm) * 1000;
-				notes.forEachAlive(function(daNote:Note)
+				var strumX:Float;
+				var strumY:Float;
+				var strumAngle:Float;
+				var strumDirection:Float;
+				var strumAlpha:Float;
+				var strumScroll:Bool;
+
+				if (daNote.mustPress) {
+					strumX = playerStrumX[daNote.noteData];
+					strumY = playerStrumY[daNote.noteData];
+					strumAngle = playerStrumAngle[daNote.noteData];
+					strumDirection = playerStrumDirection[daNote.noteData];
+					strumAlpha = playerStrumAlpha[daNote.noteData];
+					strumScroll = playerStrumScroll;
+				} else {
+					strumX = opponentStrumX[daNote.noteData];
+					strumY = opponentStrumY[daNote.noteData];
+					strumAngle = opponentStrumAngle[daNote.noteData];
+					strumDirection = opponentStrumDirection[daNote.noteData];
+					strumAlpha = opponentStrumAlpha[daNote.noteData];
+					strumScroll = playerStrumScroll;
+				}
+
+				strumX += daNote.offsetX;
+				strumY += daNote.offsetY;
+				strumAngle += daNote.offsetAngle;
+				strumAlpha *= daNote.multAlpha;
+
+				if (strumScroll)
+					daNote.distance = (0.45 * (Conductor.songPosition - daNote.strumTime) * songSpeed * daNote.multSpeed);
+				else
+					daNote.distance = (-0.45 * (Conductor.songPosition - daNote.strumTime) * songSpeed * daNote.multSpeed);
+
+				var angleDir = strumDirection * Math.PI / 180;
+				if (daNote.copyAngle)
+					daNote.angle = strumDirection - 90 + strumAngle;
+
+				if (daNote.copyAlpha)
+					daNote.alpha = strumAlpha;
+
+				if (daNote.copyX)
+					daNote.x = strumX + Math.cos(angleDir) * daNote.distance;
+
+				if (daNote.copyY)
 				{
-					var strumGroup:FlxTypedGroup<StrumNote> = playerStrums;
-					if (!daNote.mustPress)
-						strumGroup = opponentStrums;
+					daNote.y = strumY + Math.sin(angleDir) * daNote.distance;
 
-					var strumX:Float = strumGroup.members[daNote.noteData].x;
-					var strumY:Float = strumGroup.members[daNote.noteData].y;
-					var strumAngle:Float = strumGroup.members[daNote.noteData].angle;
-					var strumDirection:Float = strumGroup.members[daNote.noteData].direction;
-					var strumAlpha:Float = strumGroup.members[daNote.noteData].alpha;
-					var strumScroll:Bool = strumGroup.members[daNote.noteData].downScroll;
-
-					strumX += daNote.offsetX;
-					strumY += daNote.offsetY;
-					strumAngle += daNote.offsetAngle;
-					strumAlpha *= daNote.multAlpha;
-
-					if (strumScroll) // Downscroll
+					if (strumScroll && daNote.isSustainNote)
 					{
-						// daNote.y = (strumY + 0.45 * (Conductor.songPosition - daNote.strumTime) * songSpeed);
-						daNote.distance = (0.45 * (Conductor.songPosition - daNote.strumTime) * songSpeed * daNote.multSpeed);
-					}
-					else // Upscroll
-					{
-						// daNote.y = (strumY - 0.45 * (Conductor.songPosition - daNote.strumTime) * songSpeed);
-						daNote.distance = (-0.45 * (Conductor.songPosition - daNote.strumTime) * songSpeed * daNote.multSpeed);
-					}
-
-					var angleDir = strumDirection * Math.PI / 180;
-					if (daNote.copyAngle)
-						daNote.angle = strumDirection - 90 + strumAngle;
-
-					if (daNote.copyAlpha)
-						daNote.alpha = strumAlpha;
-
-					if (daNote.copyX)
-						daNote.x = strumX + Math.cos(angleDir) * daNote.distance;
-
-					if (daNote.copyY)
-					{
-						daNote.y = strumY + Math.sin(angleDir) * daNote.distance;
-
-						// Jesus fuck this took me so much mother fucking time AAAAAAAAAA
-						if (strumScroll && daNote.isSustainNote)
+						if (daNote.animation.curAnim.name.endsWith('end'))
 						{
-							if (daNote.animation.curAnim.name.endsWith('end'))
-							{
-								daNote.y += 10.5 * (fakeCrochet / 400) * 1.5 * songSpeed + (46 * (songSpeed - 1));
-								daNote.y -= 46 * (1 - (fakeCrochet / 600)) * songSpeed;
-								if (PlayState.isPixelStage)
-								{
-									daNote.y += 8 + (6 - daNote.originalHeightForCalcs) * PlayState.daPixelZoom;
-								}
-								else
-								{
-									daNote.y -= 19;
-								}
-							}
-							daNote.y += (Note.swagWidth / 2) - (60.5 * (songSpeed - 1));
-							daNote.y += 27.5 * ((SONG.bpm / 100) - 1) * (songSpeed - 1);
+							daNote.y += 10.5 * (fakeCrochet / 400) * 1.5 * songSpeed + (46 * (songSpeed - 1));
+							daNote.y -= 46 * (1 - (fakeCrochet / 600)) * songSpeed;
+							if (PlayState.isPixelStage)
+								daNote.y += 8 + (6 - daNote.originalHeightForCalcs) * PlayState.daPixelZoom;
+							else
+								daNote.y -= 19;
 						}
+						daNote.y += (Note.swagWidth / 2) - (60.5 * (songSpeed - 1));
+						daNote.y += 27.5 * ((SONG.bpm / 100) - 1) * (songSpeed - 1);
 					}
+				}
 
-					if (!daNote.mustPress && daNote.wasGoodHit && !daNote.hitByOpponent && !daNote.ignoreNote)
-						opponentNoteHit(daNote);
+				if (!daNote.mustPress && daNote.wasGoodHit && !daNote.hitByOpponent && !daNote.ignoreNote)
+					opponentNoteHit(daNote);
 
-					if (!daNote.blockHit && daNote.mustPress && cpuControlled && daNote.canBeHit)
+				if (!daNote.blockHit && daNote.mustPress && cpuControlled && daNote.canBeHit)
+				{
+					if (daNote.isSustainNote)
 					{
-						if (daNote.isSustainNote)
-						{
-							if (daNote.canBeHit)
-								goodNoteHit(daNote);
-						}
-						else if (daNote.strumTime <= Conductor.songPosition || daNote.isSustainNote)
-						{
+						if (daNote.canBeHit)
 							goodNoteHit(daNote);
-						}
 					}
-
-					var strum:StrumNote;
-					if (!daNote.mustPress)
-						strum = opponentStrums.members[daNote.noteData];
-					else
-						strum = playerStrums.members[daNote.noteData];
-
-					if (daNote.isSustainNote && strum.sustainReduce)
-						daNote.clipToStrumNote(strum);
-
-					// Kill extremely late notes and cause misses
-					if (Conductor.songPosition > noteKillOffset + daNote.strumTime)
+					else if (daNote.strumTime <= Conductor.songPosition || daNote.isSustainNote)
 					{
-						if (daNote.mustPress && !cpuControlled && !daNote.ignoreNote && !endingSong && (daNote.tooLate || !daNote.wasGoodHit))
-						{
-							noteMiss(daNote);
-						}
-
-						daNote.active = false;
-						daNote.visible = false;
-						invalidateNote(daNote);
+						goodNoteHit(daNote);
 					}
-				});
-			}
-			else
-			{
-				notes.forEachAlive(function(daNote:Note)
-				{
-					daNote.canBeHit = false;
-					daNote.wasGoodHit = false;
-				});
-			}
-		}
+				}
 
+				var strum:StrumNote;
+				if (!daNote.mustPress)
+					strum = opponentStrums.members[daNote.noteData];
+				else
+					strum = playerStrums.members[daNote.noteData];
+
+				if (daNote.isSustainNote && strum.sustainReduce)
+					daNote.clipToStrumNote(strum);
+
+				if (Conductor.songPosition > noteKillOffset + daNote.strumTime)
+				{
+					if (daNote.mustPress && !cpuControlled && !daNote.ignoreNote && !endingSong && (daNote.tooLate || !daNote.wasGoodHit))
+						noteMiss(daNote);
+
+					daNote.active = false;
+					daNote.visible = false;
+					invalidateNote(daNote);
+				}
+			});
+		}
+		else
+		{
+			notes.forEachAlive(function(daNote:Note)
+			{
+				daNote.canBeHit = false;
+				daNote.wasGoodHit = false;
+			});
+		}
+	}
 		checkEventNote();
 		#if debug
 		if (!endingSong && !startingSong)
@@ -3545,7 +3581,7 @@ class PlayState extends MusicBeatState
 		chartingMode = true;
 
 		#if hxdiscord_rpc
-		DiscordClient.changePresence("Chart Editor", null, null, true);
+		DiscordClient.changePresence("carting", null, null, true);
 		#end
 	}
 
@@ -3586,7 +3622,7 @@ class PlayState extends MusicBeatState
 
 				#if desktop
 				// Game Over doesn't get his own variable because it's only used here
-				DiscordClient.changePresence("Game Over - " + detailsText, SONG.song + " (" + storyDifficultyText + ")", iconP2.getCharacter());
+				DiscordClient.changePresence("he missed too many notes again... - " + detailsText, SONG.song + " (" + storyDifficultyText + ")", iconP2.getCharacter());
 				#end
 				isDead = true;
 				return true;
@@ -4983,8 +5019,8 @@ class PlayState extends MusicBeatState
 		if (!note.isSustainNote)
 		{
 			combo += 1;
-			if (combo > 9999)
-				combo = 9999;
+			if (combo > 999999)
+				combo = 999999;
 			popUpScore(note);
 			health += note.hitHealth * healthGain;
 			invalidateNote(note);
