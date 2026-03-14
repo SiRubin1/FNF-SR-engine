@@ -3267,10 +3267,8 @@ class PlayState extends MusicBeatState
 
 			var spawnStart = haxe.Timer.stamp();
 			var notesCreatedThisFrame:Int = 0;
-			var maxNotesPerFrame:Int = 50;
 			while (spawnIndex < unspawnDatas.length && unspawnDatas[spawnIndex].time - Conductor.songPosition < time * 2 && notesCreatedThisFrame < maxNotesPerFrame)
 			{
-				notesCreatedThisFrame++;
 				var noteData:ChartNoteData = unspawnDatas[spawnIndex];
 				spawnIndex++;
 				if (spawnIndex > 1000) {
