@@ -2951,6 +2951,8 @@ class PlayState extends MusicBeatState
 
 		if (npsText != null) {
 			npsText.text = 'Combo: $combo | NPS: $currentNPS | Peak NPS: $peakNPS';
+			if (currentNPS > 500)
+				trace('HIGH NPS - npsArray size: ' + npsArray.length + ' memory: ' + openfl.system.System.totalMemory);
 		}
 		callOnLuas('onUpdate', [elapsed]);
 
@@ -3264,8 +3266,11 @@ class PlayState extends MusicBeatState
 				time /= songSpeed;
 
 			var spawnStart = haxe.Timer.stamp();
-			while (spawnIndex < unspawnDatas.length && unspawnDatas[spawnIndex].time - Conductor.songPosition < time * 2)
+			var notesCreatedThisFrame:Int = 0;
+			var maxNotesPerFrame:Int = 50;
+			while (spawnIndex < unspawnDatas.length && unspawnDatas[spawnIndex].time - Conductor.songPosition < time * 2 && notesCreatedThisFrame < maxNotesPerFrame)
 			{
+				notesCreatedThisFrame++;
 				var noteData:ChartNoteData = unspawnDatas[spawnIndex];
 				spawnIndex++;
 				if (spawnIndex > 1000) {
@@ -3286,6 +3291,11 @@ class PlayState extends MusicBeatState
 
 				var susLength:Float = swagNote.sustainLength / Conductor.stepCrochet;
 				unspawnNotes.push(swagNote);
+				// sustain notes are already generated above, they're in unspawnNotes
+				// but we need to mark them to spawn immediately
+				for (tailNote in swagNote.tail) {
+					tailNote.spawned = true;
+				}
 				var floorSus:Int = Math.floor(susLength);
 
 				if (floorSus > 0)
@@ -3301,6 +3311,7 @@ class PlayState extends MusicBeatState
 						sustainNote.gfNote = noteData.isGfNote;
 						sustainNote.noteType = swagNote.noteType;
 						sustainNote.scrollFactor.set();
+						sustainNote.spawnTime = noteData.time;
 						swagNote.tail.push(sustainNote);
 						sustainNote.parent = swagNote;
 						unspawnNotes.push(sustainNote);
@@ -3316,6 +3327,11 @@ class PlayState extends MusicBeatState
 					}
 				}
 
+				unspawnNotes.sort(function(a:Note, b:Note):Int {
+					var aTime:Float = a.spawnTime > 0 ? a.spawnTime : a.strumTime;
+					var bTime:Float = b.spawnTime > 0 ? b.spawnTime : b.strumTime;
+					return FlxSort.byValues(FlxSort.ASCENDING, aTime, bTime);
+				});
 				if (swagNote.mustPress)
 					swagNote.x += FlxG.width / 2;
 				else if (ClientPrefs.data.middleScroll)
@@ -3335,7 +3351,7 @@ class PlayState extends MusicBeatState
 				if (unspawnNotes[0].multSpeed < 1)
 					time /= unspawnNotes[0].multSpeed;
 
-				while (unspawnNotes.length > 0 && unspawnNotes[0].strumTime - Conductor.songPosition < time)
+				while (unspawnNotes.length > 0 && (unspawnNotes[0].spawnTime > 0 ? unspawnNotes[0].spawnTime : unspawnNotes[0].strumTime) - Conductor.songPosition < time)
 				{
 					var dunceNote:Note = unspawnNotes[0];
 					notes.insert(0, dunceNote);
