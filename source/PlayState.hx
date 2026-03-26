@@ -249,6 +249,17 @@ class PlayState extends MusicBeatState
 	var foregroundSprites:FlxTypedGroup<BGSprite>;
 
 	public var songScore:Int = 0;
+	var playerStrumX:Array<Float> = [];
+	var playerStrumY:Array<Float> = [];
+	var playerStrumAngle:Array<Float> = [];
+	var playerStrumDirection:Array<Float> = [];
+	var playerStrumAlpha:Array<Float> = [];
+	var playerStrumScroll:Bool = false;
+	var opponentStrumX:Array<Float> = [];
+	var opponentStrumY:Array<Float> = [];
+	var opponentStrumAngle:Array<Float> = [];
+	var opponentStrumDirection:Array<Float> = [];
+	var opponentStrumAlpha:Array<Float> = [];
 	public var songHits:Int = 0;
 	public var songMisses:Int = 0;
 	public var scoreTxt:FlxText;
@@ -2951,8 +2962,6 @@ class PlayState extends MusicBeatState
 
 		if (npsText != null) {
 			npsText.text = 'Combo: $combo | NPS: $currentNPS | Peak NPS: $peakNPS';
-			if (currentNPS > 500)
-				trace('HIGH NPS - npsArray size: ' + npsArray.length + ' memory: ' + openfl.system.System.totalMemory);
 		}
 		callOnLuas('onUpdate', [elapsed]);
 
@@ -3267,7 +3276,7 @@ class PlayState extends MusicBeatState
 
 			var spawnStart = haxe.Timer.stamp();
 			var notesCreatedThisFrame:Int = 0;
-			while (spawnIndex < unspawnDatas.length && unspawnDatas[spawnIndex].time - Conductor.songPosition < time * 2 && notesCreatedThisFrame < maxNotesPerFrame)
+			while (spawnIndex < unspawnDatas.length && unspawnDatas[spawnIndex].time - Conductor.songPosition < time * 2)
 			{
 				var noteData:ChartNoteData = unspawnDatas[spawnIndex];
 				spawnIndex++;
@@ -3381,62 +3390,18 @@ class PlayState extends MusicBeatState
 		if (startedCountdown)
 		{
 			var fakeCrochet:Float = (60 / SONG.bpm) * 1000;
-			
-			// Cache strum data before the loop
-			var playerStrumX:Array<Float> = [];
-			var playerStrumY:Array<Float> = [];
-			var playerStrumAngle:Array<Float> = [];
-			var playerStrumDirection:Array<Float> = [];
-			var playerStrumAlpha:Array<Float> = [];
-			var playerStrumScroll:Bool = false;
-			var opponentStrumX:Array<Float> = [];
-			var opponentStrumY:Array<Float> = [];
-			var opponentStrumAngle:Array<Float> = [];
-			var opponentStrumDirection:Array<Float> = [];
-			var opponentStrumAlpha:Array<Float> = [];
-
-			for (i in 0...playerStrums.length) {
-				var s = playerStrums.members[i];
-				playerStrumX.push(s.x);
-				playerStrumY.push(s.y);
-				playerStrumAngle.push(s.angle);
-				playerStrumDirection.push(s.direction);
-				playerStrumAlpha.push(s.alpha);
-				playerStrumScroll = s.downScroll;
-			}
-			for (i in 0...opponentStrums.length) {
-				var s = opponentStrums.members[i];
-				opponentStrumX.push(s.x);
-				opponentStrumY.push(s.y);
-				opponentStrumAngle.push(s.angle);
-				opponentStrumDirection.push(s.direction);
-				opponentStrumAlpha.push(s.alpha);
-			}
-
 			notes.forEachAlive(function(daNote:Note)
 			{
-				var strumX:Float;
-				var strumY:Float;
-				var strumAngle:Float;
-				var strumDirection:Float;
-				var strumAlpha:Float;
-				var strumScroll:Bool;
+				var strumGroup:FlxTypedGroup<StrumNote> = playerStrums;
+				if (!daNote.mustPress)
+					strumGroup = opponentStrums;
 
-				if (daNote.mustPress) {
-					strumX = playerStrumX[daNote.noteData];
-					strumY = playerStrumY[daNote.noteData];
-					strumAngle = playerStrumAngle[daNote.noteData];
-					strumDirection = playerStrumDirection[daNote.noteData];
-					strumAlpha = playerStrumAlpha[daNote.noteData];
-					strumScroll = playerStrumScroll;
-				} else {
-					strumX = opponentStrumX[daNote.noteData];
-					strumY = opponentStrumY[daNote.noteData];
-					strumAngle = opponentStrumAngle[daNote.noteData];
-					strumDirection = opponentStrumDirection[daNote.noteData];
-					strumAlpha = opponentStrumAlpha[daNote.noteData];
-					strumScroll = playerStrumScroll;
-				}
+				var strumX:Float = strumGroup.members[daNote.noteData].x;
+				var strumY:Float = strumGroup.members[daNote.noteData].y;
+				var strumAngle:Float = strumGroup.members[daNote.noteData].angle;
+				var strumDirection:Float = strumGroup.members[daNote.noteData].direction;
+				var strumAlpha:Float = strumGroup.members[daNote.noteData].alpha;
+				var strumScroll:Bool = strumGroup.members[daNote.noteData].downScroll;
 
 				strumX += daNote.offsetX;
 				strumY += daNote.offsetY;
