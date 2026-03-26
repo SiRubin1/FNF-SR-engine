@@ -4384,7 +4384,35 @@ class PlayState extends MusicBeatState
 	}
 
 	function popUpScore(note:Note = null):Void {
-		if (ClientPrefs.data.disableCombo) return;
+		var noteDiff:Float = Math.abs(note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset);
+		vocals.volume = 1;
+
+		var daRating:Rating = Conductor.judgeNote(note, noteDiff / playbackRate);
+
+		totalNotesHit += daRating.ratingMod;
+		note.ratingMod = daRating.ratingMod;
+		if (!note.ratingDisabled)
+			daRating.increase();
+		note.rating = daRating.name;
+		var score:Int = daRating.score;
+
+		if (daRating.noteSplash && !note.noteSplashDisabled)
+			spawnNoteSplashOnNote(note);
+
+		if (!practiceMode && !cpuControlled)
+		{
+			songScore += score;
+			if (!note.ratingDisabled)
+			{
+				songHits++;
+				totalPlayed++;
+				RecalculateRating(false);
+			}
+		}
+
+		if (ClientPrefs.data.disableCombo) return; // e
+
+		//e
 	
 		var noteDiff:Float = Math.abs(note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset);
 		vocals.volume = 1;
