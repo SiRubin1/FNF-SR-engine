@@ -272,6 +272,9 @@ class PlayState extends MusicBeatState
 	var timeTxt:FlxText;
 	var scoreTxtTween:FlxTween;
 
+	var errorBar:FlxSprite;
+	var errorDot:FlxSprite;
+
 	// Stores HUD Elements in a Group
 	public var uiGroup:FlxSpriteGroup;
 	// Stores Ratings and Combo Sprites in a group
@@ -1172,6 +1175,18 @@ class PlayState extends MusicBeatState
 		npsText.borderSize = 1.25;
 		npsText.visible = !ClientPrefs.data.hideHud;
 		uiGroup.add(npsText);
+
+		errorBar = new FlxSprite(0, timeBar.y + timeBar.height + 4).makeGraphic(400, 6, 0xFF444444);
+		errorBar.screenCenter(X);
+		errorBar.scrollFactor.set();
+		errorBar.visible = ClientPrefs.data.hitErrorBar;
+		uiGroup.add(errorBar);
+
+		errorDot = new FlxSprite(0, timeBar.y + timeBar.height + 1).makeGraphic(6, 12, 0xFFFFFFFF);
+		errorDot.screenCenter(X);
+		errorDot.scrollFactor.set();
+		errorDot.visible = ClientPrefs.data.hitErrorBar;
+		uiGroup.add(errorDot);
 		
 		botplayTxt = new FlxText(400, timeBarBG.y + 55, FlxG.width - 800, "BOTPLAY", 32);
 		botplayTxt.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
@@ -3275,7 +3290,6 @@ class PlayState extends MusicBeatState
 				time /= songSpeed;
 
 			var spawnStart = haxe.Timer.stamp();
-			var notesCreatedThisFrame:Int = 0;
 			while (spawnIndex < unspawnDatas.length && unspawnDatas[spawnIndex].time - Conductor.songPosition < time * 2)
 			{
 				var noteData:ChartNoteData = unspawnDatas[spawnIndex];
@@ -4941,6 +4955,21 @@ class PlayState extends MusicBeatState
 		callOnLuas('goodNoteHit', [notes.members.indexOf(note), leData, leType, isSus]);
 
 		npsArray.push(Conductor.songPosition);
+
+		if (ClientPrefs.data.hitErrorBar && !note.isSustainNote && errorDot != null) {
+			var noteDiff:Float = note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset;
+			var maxWindow:Float = ClientPrefs.data.safeFrames * (1000 / 60);
+			var dotX:Float = errorBar.x + (errorBar.width / 2) + (noteDiff / maxWindow) * (errorBar.width / 2);
+			errorDot.x = Math.max(errorBar.x, Math.min(errorBar.x + errorBar.width - errorDot.width, dotX));
+			
+			// Color based on early/late
+			if (noteDiff < 0)
+				errorDot.color = 0xFF4444FF; // early - blue
+			else if (noteDiff > 0)
+				errorDot.color = 0xFFFF4444; // late - red
+			else
+				errorDot.color = 0xFF44FF44; // perfect - green
+		}
 
 		note.wasGoodHit = true;
 		if (ClientPrefs.data.hitsoundVolume > 0 && !note.hitsoundDisabled)

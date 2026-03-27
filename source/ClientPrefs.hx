@@ -45,6 +45,7 @@ class SaveVariables {
 	public var lowQuality:Bool = false;
 	public var shaders:Bool = true;
 	public var framerate:Int = 120;
+	public var hitErrorBar:Bool = false;
 	// -- FEEDBACK OPTIONS -- //	
 	public var scoreZoom:Bool = true;
 	public var comboStacking = true;

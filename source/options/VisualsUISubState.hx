@@ -55,6 +55,12 @@ class VisualsUISubState extends BaseOptionsMenu
 			'hideHud',
 			'bool');
 		addOption(option);
+
+		var option:Option = new Option('Hit Error Bar',
+			"If checked, shows a bar above the score text displaying how early or late your hits are.",
+			'hitErrorBar',
+			'bool');
+		addOption(option);
 		
 		var option:Option = new Option('Time Bar:',
 			"What should the Time Bar display?",
